@@ -62,12 +62,55 @@ The architecture is structured across three isolated services running on distinc
 
 ---
 
-## 6. Vulnerability Planting Roadmap (Planned Exploits)
-- **CWE-798 (Hardcoded Credentials)**:
-  - Hardcode the JWT secret key `super-secret-hardcoded-jwt-key-for-development` in `app_api/main.py`.
-  - Attacker impact: Any user can forge tokens for Charlie (`admin`) or Alice.
-- **CWE-862 (Missing Authorization / IDOR)**:
-  - Intentionally bypass the `note["owner"] == x_user` verification in `resource_service/main.py`.
-  - Attacker impact: Bob can view Alice's notes by changing the ID in the URL.
-- **Compositional Vulnerability (Confused Deputy / Implicit Trust)**:
-  - The Processing Service can trust gateway communications without enforcing downstream authorization, allowing unauthorized exports if inter-service requests are spoofed.
+## 6. Documented Planted Vulnerabilities (3 Catalog + 1 Compositional)
+
+The codebase implements a toggle switch (`VULNERABLE_MODE=true` or `python run_services.py --vulnerable`) to allow reproducible side-by-side evaluation between the vulnerable state and the hardened secure baseline.
+
+### Vulnerability 1: CWE-798 (Use of Hard-coded Credentials)
+- **Affected Component**: `services/app_api/main.py`
+- **Flaw**: When vulnerable mode is active, the JWT signing secret is hardcoded (`"insecure-hardcoded-secret-key-cwe-798"`).
+- **Exploitation**: An adversary inspects the application repository or binary, extracts the static signing key, and mints an offline arbitrary JWT claim granting admin access (`"sub": "charlie", "role": "admin"`), completely bypassing the password gate.
+- **Defense / Mitigation**: In secure mode, secrets are strictly injected from runtime environment variables (`JWT_SECRET_KEY`) with high-entropy cryptographic generation.
+
+### Vulnerability 2: CWE-862 (Missing Authorization / IDOR)
+- **Affected Component**: `services/resource_service/main.py` (`GET /notes/{note_id}`)
+- **Flaw**: The endpoint looks up the note by ID without verifying if `note["owner"] == x_user`.
+- **Exploitation**: Bob logs in legitimately, discovers note IDs are sequential integers, and requests `GET /notes/1` (belonging to Alice). The Resource Service returns Alice's confidential note.
+- **Defense / Mitigation**: Complete mediation is enforced: if `x_role != 'admin'`, the service asserts `note["owner"] == x_user`, returning `403 Forbidden` if mismatched.
+
+### Vulnerability 3: CWE-209 (Information Exposure Through Debug / Error Dumps)
+- **Affected Component**: `services/resource_service/main.py` (`GET /debug/environment`)
+- **Flaw**: Exposes raw environment variables, process configurations, and in-memory note tables to unauthenticated requesters.
+- **Exploitation**: An attacker discovers the debug route and immediately dumps all tenant notes and environment variables without needing any user credentials.
+- **Defense / Mitigation**: The endpoint is disabled in production/secure mode, returning `403 Forbidden`.
+
+### Vulnerability 4: Compositional Vulnerability (Confused Deputy & Inter-Service Implicit Trust)
+- **Affected Component**: `services/processing_service/main.py` & inter-service interaction with `resource_service`
+- **Flaw**: The Processing Service blindly trusts incoming internal network requests on port 8002 without verifying client authentication headers, and queries the Resource Service using an elevated internal admin role (`X-Role: admin`).
+- **Exploitation**: An attacker with access to the internal network sends a direct request to `POST http://127.0.0.1:8002/export/1` bypassing the Application API Gateway completely. The Processing Service acts as a "Confused Deputy", fetches Alice's private note as admin, and renders it to the attacker.
+- **Defense / Mitigation**: Principle of Least Privilege and Caller Context Propagation: Component 3 enforces the originating user's identity headers and forwards them directly to Component 2 without privilege escalation.
+
+---
+
+## 7. How to Reproduce & Verify
+
+### Test 1: Verify All Defenses in Secure Baseline
+```bash
+# Terminal 1: Run in Secure Mode (Default)
+python run_services.py
+
+# Terminal 2: Run verification test
+pytest -s -v tests/test_vulnerabilities.py
+```
+*Result: All 4 exploits are blocked (`[DEFENSE ACTIVE]`).*
+
+### Test 2: Demonstrate All 4 Exploits in Vulnerable Mode
+```bash
+# Terminal 1: Run in Vulnerable Mode
+python run_services.py --vulnerable
+
+# Terminal 2: Run verification test
+pytest -s -v tests/test_vulnerabilities.py
+```
+*Result: All 4 exploits succeed (`[EXPLOIT SUCCEEDED]`).*
+

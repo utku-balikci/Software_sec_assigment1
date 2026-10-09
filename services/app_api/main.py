@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Depends, status, Response
@@ -13,17 +14,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# JWT Configuration
-# Note: Seeded secret for initial setup / vulnerability demonstration (CWE-798)
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-hardcoded-jwt-key-for-development")
+# Vulnerability Toggle: Controlled via VULNERABLE_MODE environment variable
+VULNERABLE_MODE = os.getenv("VULNERABLE_MODE", "false").lower() in ("true", "1", "yes")
+
+# --- Planted Vulnerability 3: CWE-798 (Use of Hard-coded Credentials) ---
+if VULNERABLE_MODE:
+    # VULNERABLE: Known hardcoded secret committed into version control
+    JWT_SECRET_KEY = "insecure-hardcoded-secret-key-cwe-798"
+else:
+    # SECURE: Production key loaded from secure runtime environment
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "prod-secure-key-92840918230912830918203918230918")
+
 JWT_ALGORITHM = "HS256"
 
 RESOURCE_SERVICE_URL = os.getenv("RESOURCE_SERVICE_URL", "http://127.0.0.1:8001")
 PROCESSING_SERVICE_URL = os.getenv("PROCESSING_SERVICE_URL", "http://127.0.0.1:8002")
 
-# Seeded users per Access Control Matrix
-# Ordinary users: Alice, Bob
-# Admin user: Charlie
 USERS_DB = {
     "alice": {"password": "password123", "role": "user", "name": "Alice"},
     "bob": {"password": "password123", "role": "user", "name": "Bob"},
@@ -57,15 +63,19 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         username: str = payload.get("sub")
         role: str = payload.get("role")
-        if username is None or username not in USERS_DB:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user token")
+        if username is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject")
         return {"username": username, "role": role}
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "app_api"}
+    return {
+        "status": "ok", 
+        "service": "app_api",
+        "vulnerable_mode": VULNERABLE_MODE
+    }
 
 @app.post("/auth/login", response_model=TokenResponse)
 def login(creds: LoginRequest):

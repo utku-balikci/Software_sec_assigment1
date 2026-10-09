@@ -15,10 +15,13 @@ def main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     py_exec = get_python_executable()
     
-    # Add packages to PYTHONPATH for child processes
+    # Check if launched in vulnerable mode
+    is_vulnerable = ("--vulnerable" in sys.argv) or (os.getenv("VULNERABLE_MODE", "false").lower() in ("true", "1", "yes"))
+    
     env = os.environ.copy()
     pkg_dir = os.path.join(base_dir, "packages", "html_note_formatter")
     env["PYTHONPATH"] = f"{pkg_dir}:{env.get('PYTHONPATH', '')}"
+    env["VULNERABLE_MODE"] = "true" if is_vulnerable else "false"
 
     SERVICES = [
         {"name": "Resource Service (Port 8001)", "cwd": "services/resource_service", "cmd": [py_exec, "-m", "uvicorn", "main:app", "--port", "8001"]},
@@ -28,9 +31,13 @@ def main():
 
     processes = []
     
-    print("=" * 60)
+    print("=" * 65)
     print("Starting Secure Notes & Export Microservices Architecture...")
-    print("=" * 60)
+    if is_vulnerable:
+        print("  >>> MODE: [VULNERABLE MODE ACTIVE] (Planted Flaws Enabled) <<<")
+    else:
+        print("  >>> MODE: [SECURE BASELINE] (Controls & Gates Enforced) <<<")
+    print("=" * 65)
     
     def cleanup(signum=None, frame=None):
         print("\nStopping services...")
@@ -49,7 +56,7 @@ def main():
         print(f"[+] Launching {svc['name']}...")
         p = subprocess.Popen(svc["cmd"], cwd=full_cwd, env=env)
         processes.append(p)
-        time.sleep(1) # stagger launch
+        time.sleep(1)
 
     print("\nAll 3 services are active!")
     print("API Gateway Swagger Docs: http://127.0.0.1:8000/docs")
