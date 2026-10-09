@@ -1,8 +1,12 @@
+import os
 from fastapi import FastAPI, HTTPException, Header, status
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 
 app = FastAPI(title="Resource Service (Component 2)", version="1.0.0")
+
+# Vulnerability Toggle: Controlled via VULNERABLE_MODE environment variable
+VULNERABLE_MODE = os.getenv("VULNERABLE_MODE", "false").lower() in ("true", "1", "yes")
 
 class NoteCreate(BaseModel):
     title: str
@@ -23,7 +27,11 @@ next_note_id = 3
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "resource_service"}
+    return {
+        "status": "ok", 
+        "service": "resource_service",
+        "vulnerable_mode": VULNERABLE_MODE
+    }
 
 @app.post("/notes", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 def create_note(note: NoteCreate, x_user: Optional[str] = Header(None)):
@@ -59,10 +67,12 @@ def get_note(note_id: int, x_user: Optional[str] = Header(None), x_role: Optiona
     
     note = notes_db[note_id]
     
-    # Access Control Matrix:
-    # Alice's notes: Alice (Read/Write), Bob (Denied), Charlie/Admin (Read Only)
-    # Bob's notes: Bob (Read/Write), Alice (Denied), Charlie/Admin (Read Only)
-    # NOTE: In vulnerable mode (CWE-862 IDOR), this ownership check can be skipped.
+    # --- Planted Vulnerability 1: CWE-862 (Missing Authorization / IDOR) ---
+    if VULNERABLE_MODE:
+        # VULNERABLE: Omits ownership verification. Any authenticated user can read any note ID.
+        return note
+    
+    # --- SECURE: Complete Mediation & Least Privilege ---
     if x_role != "admin" and note["owner"] != x_user:
         raise HTTPException(status_code=403, detail="Forbidden: You do not own this note")
         
@@ -77,13 +87,24 @@ def delete_note(note_id: int, x_user: Optional[str] = Header(None), x_role: Opti
     
     # Access Control Matrix:
     # Feature 'Delete Any Note': Ordinary users (Denied), Admin (Allowed)
-    if x_role != "admin" and note["owner"] != x_user:
-        raise HTTPException(status_code=403, detail="Forbidden: Not authorized to delete this note")
     if x_role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden: Ordinary users cannot delete notes per policy")
 
     deleted = notes_db.pop(note_id)
     return {"message": f"Note {note_id} deleted successfully", "note": deleted}
+
+# --- Planted Vulnerability 2: CWE-209 (Information Exposure Through Error / Debug Messages) ---
+@app.get("/debug/environment")
+def debug_environment():
+    if VULNERABLE_MODE:
+        # VULNERABLE: Exposes raw environment variables, process details, and in-memory dumps
+        return {
+            "status": "vulnerable_debug_exposure",
+            "environment": dict(os.environ),
+            "all_notes": notes_db
+        }
+    # SECURE: Blocked in production / secure mode
+    raise HTTPException(status_code=403, detail="Access denied: Debug endpoints are disabled in secure mode")
 
 if __name__ == "__main__":
     import uvicorn
