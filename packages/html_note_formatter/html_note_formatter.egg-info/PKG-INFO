@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: html_note_formatter
+Version: 0.1.0
+Summary: Helper library to format notes into HTML reports
+Requires-Python: >=3.8
+Dynamic: requires-python
+Dynamic: summary

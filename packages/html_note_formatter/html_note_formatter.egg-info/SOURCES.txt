@@ -1,0 +1,7 @@
+setup.py
+html_note_formatter/__init__.py
+html_note_formatter/formatter.py
+html_note_formatter.egg-info/PKG-INFO
+html_note_formatter.egg-info/SOURCES.txt
+html_note_formatter.egg-info/dependency_links.txt
+html_note_formatter.egg-info/top_level.txt
