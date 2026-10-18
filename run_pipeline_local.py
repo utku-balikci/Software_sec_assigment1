@@ -2,6 +2,7 @@ import subprocess
 import sys
 import time
 import os
+## for local tests 
 
 def main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
