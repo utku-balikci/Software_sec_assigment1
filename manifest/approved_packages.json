@@ -1,0 +1,13 @@
+{
+  "_comment": "Consumer-controlled approval manifest. This file must be kept read-only and outside supplier write permissions.",
+  "schema_version": "1.0",
+  "packages": [
+    {
+      "name": "html_note_formatter",
+      "version": "0.1.0",
+      "source": "packages/html_note_formatter/dist/html_note_formatter-0.1.0-py3-none-any.whl",
+      "algorithm": "sha256",
+      "digest": "c78738054c6302873d424ea2c14ecd05a214140e9dfd3ba12e417be734ab0f55"
+    }
+  ]
+}

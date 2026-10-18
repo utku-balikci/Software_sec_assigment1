@@ -8,15 +8,36 @@ pipeline {
     stages {
         stage('Checkout & Setup') {
             steps {
-                echo 'Setting up Python virtual environment and installing dependencies...'
+                echo 'Setting up Python virtual environment...'
                 sh '''
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip
                     pip install fastapi uvicorn requests pyjwt pytest build wheel
+                '''
+            }
+        }
+
+        stage('Package Integrity Gate') {
+            steps {
+                echo 'Verifying supplier artifact against consumer-controlled manifest...'
+                sh '''
+                    # Lock the manifest so the supplier cannot alter it during the build
+                    chmod 444 manifest/approved_packages.json
+
+                    . venv/bin/activate
+
+                    # Build the wheel from source so we have the artifact to verify
                     cd packages/html_note_formatter
                     python -m build --wheel
-                    pip install dist/*.whl
+                    cd ../..
+
+                    # Run integrity check — pipeline aborts here if digest mismatches
+                    python3 scripts/verify_integrity.py
+
+                    # Gate passed: safe to install
+                    . venv/bin/activate
+                    pip install packages/html_note_formatter/dist/*.whl
                 '''
             }
         }
