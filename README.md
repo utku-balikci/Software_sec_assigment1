@@ -98,7 +98,32 @@ python3 scripts/demo_tamper.py
 
 ---
 
-## Documentation & Lifecycle Plan
-- **Initial Blueprint & Threat Model:** `docs/PLANNING_AND_STRIDE.md`
-- **Supply Chain Integrity Report:** `docs/experiment_a_report.md`
-- **Full Report (PDF):** `Softwaresec_Assigment1_utku.pdf`
+## 5. Supply Chain Integrity & Artifacts (Experiment A)
+
+To demonstrate defense against dependency substitution attacks, the repository provides both authentic and malicious packages alongside a consumer approval manifest:
+
+- **Consumer Approval Manifest:** [`manifest/approved_packages.json`](manifest/approved_packages.json)  
+  Contains the consumer-approved cryptographic digest (`c7873805...`). Maintained outside supplier write path and locked to `chmod 444` in CI.
+
+- **Authentic Wheel (Clean):**  
+  [`packages/html_note_formatter/dist/html_note_formatter-0.1.0-py3-none-any.whl`](packages/html_note_formatter/dist/html_note_formatter-0.1.0-py3-none-any.whl)  
+  - **SHA-256:** `c78738054c6302873d424ea2c14ecd05a214140e9dfd3ba12e417be734ab0f55`  
+  - **Gate Decision:** **PASS** (matches manifest; installation proceeds)
+
+- **Malicious / Tampered Wheel:**  
+  [`packages/html_note_formatter/dist/html_note_formatter-0.1.0-py3-none-any.tampered.whl`](packages/html_note_formatter/dist/html_note_formatter-0.1.0-py3-none-any.tampered.whl)  
+  - **SHA-256:** `053ec0614abc95bd4c8d3c412fef9901521245428ebe723a70be7d2a0c83ba56`  
+  - **Gate Decision:** **BLOCKED** (`scripts/verify_integrity.py` exits with code `1`, halting the build)
+
+### Reproduce Experiment A:
+```bash
+# Automated end-to-end lifecycle test (PASS -> TAMPER -> RESTORE)
+python3 scripts/demo_tamper.py
+```
+
+---
+
+## 6. Documentation & Lifecycle Plan
+- **Initial Blueprint & Threat Model:** [`docs/PLANNING_AND_STRIDE.md`](docs/PLANNING_AND_STRIDE.md)
+- **Supply Chain Integrity Report:** [`docs/experiment_a_report.md`](docs/experiment_a_report.md)
+- **Full Report (PDF):** [`Softwaresec_Assigment1_utku.pdf`](Softwaresec_Assigment1_utku.pdf)
