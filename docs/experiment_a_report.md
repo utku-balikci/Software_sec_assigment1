@@ -2,7 +2,7 @@
 
 **Generated:** 2026-10-18 20:12:34  
 **Project:** Secure Notes & Export System  
-**Assignment:** Software Security — Assignment 1
+**Assignment:** Software Security  Assignment 1
 
 ---
 
